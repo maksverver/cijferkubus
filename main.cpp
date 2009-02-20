@@ -1,6 +1,11 @@
+#include "MainWindow.h"
+#include "Timing.h"
+
 #include <FL/Fl.h>
 #include <FL/Fl_PNG_Image.H>
-#include "MainWindow.h"
+
+#include <stdio.h>
+#include <assert.h>
 
 #define SYM1 0
 #define SYM2 1
@@ -38,9 +43,25 @@ Cube gTestCube = { {
     { SYM6, 2 }, { SYM5, 1 }, { SYM6, 0 },
     { SYM7, 0 }, { SYM8, 0 }, { SYM9, 0 } } };
 
+void benchmark()
+{
+    Cube cube = gTestCube;
+    double dt = time_now();
+    const int num_moves = 1000000;
+    for (int n = 0; n < num_moves; ++n) cube.move(n%6);
+    dt = time_now() - dt;
+    printf( "%d moves in %.3f seconds; %.3f million moves per second\n",
+            num_moves, dt, num_moves/dt*1e-6  );
+}
 
 int main()
 {
+    assert(gSolvedCube.seemsValid());
+    assert(gTestCube.seemsValid());
+    assert(gSolvedCube != gTestCube);
+
+    benchmark();
+
     Fl_RGB_Image *img = new Fl_PNG_Image("labels.png");
 
     MainWindow *win = new MainWindow(100, 100, 500, 500, "Cijferkubus", img);

@@ -1,8 +1,8 @@
-OBJS=Cube.o MainWindow.o main.o
+OBJS=Cube.o MainWindow.o Timing.o main.o
 BIN=cijferkubus
 FLTK_CONFIG=fltk-config --use-gl --use-images
 
-CXXFLAGS=`$(FLTK_CONFIG) --cxxflags` -Wall -Wextra
+CXXFLAGS=`$(FLTK_CONFIG) --cxxflags` -Wall -Wextra -g -O3
 LDFLAGS=`$(FLTK_CONFIG) --ldflags`
 
 $(BIN):	$(OBJS)

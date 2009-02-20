@@ -7,6 +7,10 @@
 #include <FL/Fl_RGB_Image.h>
 #include <FL/gl.h>
 
+#include <vector>
+#include <deque>
+
+
 class MainWindow
     : public Fl_Gl_Window
 {
@@ -18,9 +22,12 @@ public:
     void setCube(Cube &cube) { mCube = cube; }
     const Cube &cube() { return mCube; }
 
+    void animate(std::vector<int> moves);
+
 protected:
     void draw();
     int handle(int event);
+    bool tick();
 
 private:
     Cube mCube;
@@ -28,6 +35,14 @@ private:
     double mRotX, mRotY;
     GLuint mLabelsTexture;
     Fl_RGB_Image *mLabelsImage;
+    std::deque<int> mAnimMoves;
+
+    double mAnimLastTime;
+    int mAnimRotFace;
+    float mAnimRotAngle;
+    float mAnimRotTime;
+
+    friend void main_window_tick_callback(void *arg);
 };
 
 #endif /* ndef MAIN_WINDOW_H_INCLUDED */
