@@ -14,7 +14,7 @@ static const float gFaceRotY[6] = {   0,   0,  90, 180, -90,   0 };
 #define BIT(i) (1<<(i))
 
 static const int gFPS = 50;
-static const float gFaceTurnTime = 0.4;
+static const float gFaceTurnTime = 0.333333333;
 
 static const float gFaceAxis[6][3] = {
     {  0,  1,  0 }, {  0,  0,  1 }, {  1,  0,  0 },
@@ -56,9 +56,11 @@ void main_window_tick_callback(void *arg)
 MainWindow::MainWindow( int x, int y, int w, int h, const char *winTitle,
                         Fl_RGB_Image *labels )
     : Fl_Gl_Window(x, y, w, h, winTitle),
-      mCube(gSolvedCube), mLabelsTexture(0), mLabelsImage(labels),
+      mCube(gSolvedCube),
+      mLabelsTexture(0), mLabelsImage(labels),
       mAnimRotFace(-1), mAnimRotAngle(0)
 {
+    setView();
 }
 
 MainWindow::~MainWindow()
@@ -69,17 +71,31 @@ MainWindow::~MainWindow()
 
 void MainWindow::animate(std::vector<int> moves)
 {
-    Fl::remove_timeout(&main_window_tick_callback);
-
-    mAnimMoves.assign(moves.begin(), moves.end());
-    if (!moves.empty())
+    if (!mAnimMoves.empty())
     {
-        mAnimRotFace = moves.front();
-        mAnimRotTime = 0;
-        mAnimLastTime = time_now();
-
-        Fl::add_timeout(1.0/gFPS, main_window_tick_callback, this);
+        mAnimMoves.insert(mAnimMoves.end(), moves.begin(), moves.end());
+        return;
     }
+    else
+    {
+        Fl::remove_timeout(&main_window_tick_callback);
+
+        mAnimMoves.assign(moves.begin(), moves.end());
+        if (!moves.empty())
+        {
+            mAnimRotFace = moves.front();
+            mAnimRotTime = 0;
+            mAnimLastTime = time_now();
+
+            Fl::add_timeout(1.0/gFPS, main_window_tick_callback, this);
+        }
+    }
+}
+
+void MainWindow::setView(float rotX, float rotY)
+{
+    mRotX = rotX;
+    mRotY = rotY;
 }
 
 void MainWindow::draw()
@@ -93,6 +109,7 @@ void MainWindow::draw()
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         gluPerspective(45.0f, (float)w()/(float)h(), 1, 100);
+        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
         // Set background color
         glClearColor(0.1f, 0.1f, 0.2f, 0.0f);
@@ -113,10 +130,15 @@ void MainWindow::draw()
         glDeleteTextures(1, &mLabelsTexture);
         glGenTextures(1, &mLabelsTexture);
         glBindTexture(GL_TEXTURE_2D, mLabelsTexture);
+        gluBuild2DMipmaps( GL_TEXTURE_2D, GL_RGB,
+                           mLabelsImage->w(), mLabelsImage->h(), 
+                           GL_RGBA, GL_UNSIGNED_BYTE, mLabelsImage->data()[0] );
+        /*
         glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB,
                       mLabelsImage->w(), mLabelsImage->h(), 0,
                       GL_RGBA, GL_UNSIGNED_BYTE, mLabelsImage->data()[0] );
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        */
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 
@@ -210,16 +232,8 @@ int MainWindow::handle(int event)
         switch (Fl::event_key())
         {
         case 'r':
-            // Reset rotation
-            mRotX = mRotY = 0;
+            setView();
             redraw();
-            return 1;
-
-        case 't':
-            {
-                int a[12] = { 0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0 };
-                animate(std::vector<int>(a, a + 12));
-            }
             return 1;
 
         case '0': animate(std::vector<int>(1, 0)); return 1;

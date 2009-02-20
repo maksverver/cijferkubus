@@ -126,3 +126,30 @@ void Cube::move(int f)
         }
     }
 }
+
+bool readCube(std::istream &is, Cube &cube)
+{
+    for (int n = 0; n < Cube::num_faces; ++n)
+    {
+        int i;
+        if (!(is >> i)) return false;
+        int d = i/10;  // digit
+        int r = i%10;  // rotation (anticlockwise)
+        if (d < 1 || d > 9 || r < 0 || r >= 4) return false;
+        cube.face(n).sym = d - 1;
+        cube.face(n).rot = r;
+    }
+    return true;
+}
+
+bool writeCube(std::ostream &os, Cube &cube)
+{
+    for (int n = 0; n < Cube::num_faces; ++n)
+    {
+        if (n > 0 && n%9 == 0) os << '\n';
+        os << 10 + 10*cube.face(n).sym + cube.face(n).rot
+           << ((n%3 == 2) ? '\n' : ' ' );
+        if (!os) return false;
+    }
+    return true;
+}

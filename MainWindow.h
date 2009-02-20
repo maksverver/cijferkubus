@@ -23,6 +23,7 @@ public:
     const Cube &cube() { return mCube; }
 
     void animate(std::vector<int> moves);
+    void setView(float rotX = 30, float rotY = -30);
 
 protected:
     void draw();
@@ -32,7 +33,7 @@ protected:
 private:
     Cube mCube;
     int mLastX, mLastY;
-    double mRotX, mRotY;
+    float mRotX, mRotY;
     GLuint mLabelsTexture;
     Fl_RGB_Image *mLabelsImage;
     std::deque<int> mAnimMoves;

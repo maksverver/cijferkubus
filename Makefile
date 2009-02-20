@@ -1,19 +1,23 @@
-OBJS=Cube.o MainWindow.o Timing.o main.o
-BIN=cijferkubus
+SOLVER_OBJS=Cube.o Solver.o Timing.o main-solver.o
+VIEWER_OBJS=Cube.o Timing.o MainWindow.o main-viewer.o
+BINARIES=solver viewer
+
 FLTK_CONFIG=fltk-config --use-gl --use-images
-
 CXXFLAGS=`$(FLTK_CONFIG) --cxxflags` -Wall -Wextra -g -O3
-LDFLAGS=`$(FLTK_CONFIG) --ldflags`
 
-$(BIN):	$(OBJS)
-	g++ $(LDFLAGS) -o $@ $^
+all: $(BINARIES)
 
-all: $(BIN)
+solver:	$(SOLVER_OBJS)
+	g++ -o $@ $^
+
+viewer:	$(VIEWER_OBJS)
+	g++ `$(FLTK_CONFIG) --ldflags` -o $@ $^
+
 
 clean:
-	rm -f $(OBJS)
+	rm -f $(SOLVER_OBJS) $(VIEWER_OBJS)
 
 distclean: clean
-	rm -f $(BIN)
+	rm -f $(BINARIES)
 
 .PHONY: all clean distclean
