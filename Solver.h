@@ -4,8 +4,14 @@
 #include "Cube.h"
 #include "Move.h"
 
+#include <unordered_map>
 #include <vector>
 #include <map>
+
+struct CubeHasher
+{
+    size_t operator() (const Cube &cube) const { return cube.hashCode(); }
+};
 
 class Solver
 {
@@ -21,7 +27,7 @@ private:
 
 private:
     const Cube mInitialCube;
-    std::map<Cube, size_t> mCubeToId;
+    std::unordered_map<Cube, size_t, CubeHasher> mCubeToId;
     std::vector<const Cube*> mIdToCube;
 };
 

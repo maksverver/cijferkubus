@@ -8,7 +8,7 @@
 struct Face
 {
     unsigned char sym : 4;  /* 0..8 */
-    unsigned char rot : 2;  /* 0..3 */
+    unsigned char rot : 4;  /* 0..3 */
 
     bool operator== (const Face &f) const { return sym == f.sym && rot == f.rot; }
     bool operator!= (const Face &f) const { return sym != f.sym || rot != f.rot; }
@@ -47,6 +47,8 @@ struct Cube
     /* Turn face `f` in counter-clockwise direction `t` times.
        (f is between 0 and 6, exclusive) */
     void move(int f, int t = 1);
+
+    size_t hashCode() const;
 };
 
 bool readCube(std::istream &is, Cube &cube);

@@ -1,9 +1,10 @@
 SOLVER_OBJS=Cube.o Move.o Solver.o Timing.o main-solver.o
 VIEWER_OBJS=Cube.o Move.o Timing.o MainWindow.o main-viewer.o
-BINARIES=solver viewer
+RANDOM_OBJS=Cube.o main-random.cpp
+BINARIES=solver viewer random-cube
 
 FLTK_CONFIG=fltk-config --use-gl --use-images
-CXXFLAGS=`$(FLTK_CONFIG) --cxxflags` -Wall -Wextra -g -O3
+CXXFLAGS=`$(FLTK_CONFIG) --cxxflags` -Wall -Wextra -std=c++0x -O3 -g
 
 all: $(BINARIES)
 
@@ -13,6 +14,8 @@ solver:	$(SOLVER_OBJS)
 viewer:	$(VIEWER_OBJS)
 	g++ `$(FLTK_CONFIG) --ldflags` -o $@ $^
 
+random-cube: $(RANDOM_OBJS)
+	g++ -o $@ $^
 
 clean:
 	rm -f $(SOLVER_OBJS) $(VIEWER_OBJS)

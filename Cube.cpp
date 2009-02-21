@@ -133,6 +133,18 @@ void Cube::move(int f, int t)
     }
 }
 
+size_t Cube::hashCode() const // 64-bit FNV-1 hash
+{
+    assert(sizeof(Face) == 1 && sizeof(size_t) == 8);
+    size_t hash = 14695981039346656037ULL;
+    for (int n = 0; n < num_faces; ++n)
+    {
+        hash *= 1099511628211ULL;
+        hash ^= ((unsigned char*)faces)[n];
+    }
+    return hash;
+}
+
 bool readCube(std::istream &is, Cube &cube)
 {
     for (int n = 0; n < Cube::num_faces; ++n)

@@ -8,6 +8,9 @@ extern const char * const move_str[6][4];
 struct Move
 {
     unsigned char face, turn;
+
+    bool operator== (const Move &m) { return face == m.face && turn == m.turn; }
+    bool operator!= (const Move &m) { return face != m.face || turn != m.turn; }
 };
 
 std::ostream &operator<< (std::ostream &os, const Move &move);
