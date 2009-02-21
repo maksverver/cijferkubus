@@ -78,51 +78,57 @@ static void rot4(Face &f, Face &g, Face &h, Face &i)
     f = old_i;
 }
 
-void Cube::move(int f)
+void Cube::move(int f, int t)
 {
-    // Rotate faces on top
-    rot4(face(f, 0, 0), face(f, 2, 0), face(f, 2, 2), face(f, 0, 2));
-    rot4(face(f, 0, 1), face(f, 1, 0), face(f, 2, 1), face(f, 1, 2));
-    for (int n = 0; n < 9; ++n) face(f, n).rotate(1);
+    assert(t > 0 && t < 4);
 
-    // Determine how to rotate faces on sides
-    int fid[4], row[4], col[4], dir[4];
-    for (int n = 0; n < 4; ++n)
+    while (t-- > 0)
     {
-        fid[n] = gFaceBorderRotation[f][n][0];
-        row[n] = gFaceBorderRotation[f][n][1];
-        col[n] = gFaceBorderRotation[f][n][2];
-        dir[n] = gFaceBorderRotation[f][n][3];
-    }
 
-    // Rotate faces on sides
-    for (int d = 0; d < 3; ++d)
-    {
-        // DEBUG:
-        /*
-        printf("step %d:", d);
+        // Rotate faces on top
+        rot4(face(f, 0, 0), face(f, 2, 0), face(f, 2, 2), face(f, 0, 2));
+        rot4(face(f, 0, 1), face(f, 1, 0), face(f, 2, 1), face(f, 1, 2));
+        for (int n = 0; n < 9; ++n) face(f, n).rotate(1);
+
+        // Determine how to rotate faces on sides
+        int fid[4], row[4], col[4], dir[4];
         for (int n = 0; n < 4; ++n)
         {
-            printf(" (%d,%d,%d)", fid[n], row[n], col[n]);
-            assert(row[n] >= 0 && row[n] < 3);
-            assert(col[n] >= 0 && col[n] < 3);
+            fid[n] = gFaceBorderRotation[f][n][0];
+            row[n] = gFaceBorderRotation[f][n][1];
+            col[n] = gFaceBorderRotation[f][n][2];
+            dir[n] = gFaceBorderRotation[f][n][3];
         }
-        printf("\n");
-        */
 
-        Face &a = face(fid[0], row[0], col[0]);
-        Face &b = face(fid[1], row[1], col[1]);
-        Face &c = face(fid[2], row[2], col[2]);
-        Face &d = face(fid[3], row[3], col[3]);
-        rot4(a, b, c, d);
-        a.rotate((dir[0] - dir[3] + 4)%4);
-        b.rotate((dir[1] - dir[0] + 4)%4);
-        c.rotate((dir[2] - dir[1] + 4)%4);
-        d.rotate((dir[3] - dir[2] + 4)%4);
-        for (int n = 0; n < 4; ++n)
+        // Rotate faces on sides
+        for (int d = 0; d < 3; ++d)
         {
-            row[n] += DR[dir[n]];
-            col[n] += DC[dir[n]];
+            // DEBUG:
+            /*
+            printf("step %d:", d);
+            for (int n = 0; n < 4; ++n)
+            {
+                printf(" (%d,%d,%d)", fid[n], row[n], col[n]);
+                assert(row[n] >= 0 && row[n] < 3);
+                assert(col[n] >= 0 && col[n] < 3);
+            }
+            printf("\n");
+            */
+
+            Face &a = face(fid[0], row[0], col[0]);
+            Face &b = face(fid[1], row[1], col[1]);
+            Face &c = face(fid[2], row[2], col[2]);
+            Face &d = face(fid[3], row[3], col[3]);
+            rot4(a, b, c, d);
+            a.rotate((dir[0] - dir[3] + 4)%4);
+            b.rotate((dir[1] - dir[0] + 4)%4);
+            c.rotate((dir[2] - dir[1] + 4)%4);
+            d.rotate((dir[3] - dir[2] + 4)%4);
+            for (int n = 0; n < 4; ++n)
+            {
+                row[n] += DR[dir[n]];
+                col[n] += DC[dir[n]];
+            }
         }
     }
 }
@@ -142,7 +148,7 @@ bool readCube(std::istream &is, Cube &cube)
     return true;
 }
 
-bool writeCube(std::ostream &os, Cube &cube)
+bool writeCube(std::ostream &os, const Cube &cube)
 {
     for (int n = 0; n < Cube::num_faces; ++n)
     {

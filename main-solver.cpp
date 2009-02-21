@@ -16,10 +16,10 @@ void benchmark()
             num_moves, dt, num_moves/dt*1e-6  );
 }
 
-bool write_solution(std::ostream &os, const std::vector<int> &solution)
+bool write_solution(std::ostream &os, const std::vector<Move> &solution)
 {
     if (!(os << solution.size() << '\n')) return false;
-    for ( std::vector<int>::const_iterator it = solution.begin();
+    for ( std::vector<Move>::const_iterator it = solution.begin();
           it != solution.end(); ++it )
     {
         if (!(os << *it << '\n')) return false;
@@ -52,7 +52,7 @@ int main(int argc, const char *argv[])
         }
     }
 
-    std::vector<int> solution;
+    std::vector<Move> solution;
     Solver solver(cube);
     if (!solver.solve(solution))
     {

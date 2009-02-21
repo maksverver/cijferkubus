@@ -2,6 +2,7 @@
 #define SOLVER_H_INCLUDED
 
 #include "Cube.h"
+#include "Move.h"
 
 #include <vector>
 #include <map>
@@ -12,7 +13,7 @@ public:
     Solver(const Cube &c);
     ~Solver();
 
-    bool solve(std::vector<int> &solution);
+    bool solve(std::vector<Move> &solution);
 
 private:
     size_t cubeToId(const Cube &c);

@@ -16,6 +16,7 @@ struct Face
     void rotate(unsigned n) { rot = (rot + n)%4; }
 };
 
+
 struct Cube
 {
     static const int num_faces = 54;
@@ -43,11 +44,13 @@ struct Cube
     */
     bool seemsValid() const;
 
-    void move(int f);
+    /* Turn face `f` in counter-clockwise direction `t` times.
+       (f is between 0 and 6, exclusive) */
+    void move(int f, int t = 1);
 };
 
 bool readCube(std::istream &is, Cube &cube);
-bool writeCube(std::ostream &os, Cube &cube);
+bool writeCube(std::ostream &os, const Cube &cube);
 
 extern const Cube gSolvedCube;
 

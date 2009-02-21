@@ -1,6 +1,7 @@
 #include "Cube.h"
 #include "MainWindow.h"
 #include "Solver.h"
+#include "Move.h"
 #include "Timing.h"
 
 #include <FL/Fl.h>
@@ -11,16 +12,16 @@
 
 #include <fstream>
 
-bool readSolution(std::istream &is, std::vector<int> &solution)
+bool readSolution(std::istream &is, std::vector<Move> &solution)
 {
     solution.clear();
     int size;
     if (!(is >> size) || size < 0) return false;
     for (int n = 0; n < size; ++n)
     {
-        int f;
-        if (!(is >> f) || f < 0 || f >= 6) return false;
-        solution.push_back(f);
+        Move m;
+        if (!(is >> m))return false;
+        solution.push_back(m);
     }
     return true;
 }
@@ -43,7 +44,7 @@ int main(int argc, const char *argv[])
         }
     }
 
-    std::vector<int> solution;
+    std::vector<Move> solution;
     if (argc > 2)
     {
         std::ifstream ifs(argv[2]);
@@ -58,7 +59,7 @@ int main(int argc, const char *argv[])
     MainWindow *win = new MainWindow(100, 100, 500, 500, "Cijferkubus", img);
     win->size_range(200, 200, 0, 0, 0, 0, 0);
     win->setCube(cube);
-    win->animate(solution);
+    win->addMoves(solution);
     win->end();
     win->show();
     return Fl::run();

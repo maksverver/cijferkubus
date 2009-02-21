@@ -2,19 +2,22 @@
 
 #include "Timing.h"
 
-#include <FL/Fl.H>
 #include <FL/glu.h>
+#include <FL/Fl.H>
+#include <FL/Fl_File_Chooser.H>
 
 #include <assert.h>
 #include <stdio.h>  // debug
 
-static const float gFaceRotX[6] = { -90,   0,   0,   0,   0,  90 };
-static const float gFaceRotY[6] = {   0,   0,  90, 180, -90,   0 };
+#include <fstream>
 
 #define BIT(i) (1<<(i))
 
+static const float gFaceRotX[6] = { -90,   0,   0,   0,   0,  90 };
+static const float gFaceRotY[6] = {   0,   0,  90, 180, -90,   0 };
+
 static const int gFPS = 50;
-static const float gFaceTurnTime = 0.333333333;
+static const float gFaceTurnTime = 0.5;
 
 static const float gFaceAxis[6][3] = {
     {  0,  1,  0 }, {  0,  0,  1 }, {  1,  0,  0 },
@@ -49,8 +52,27 @@ static const int gFaceMap[6][3][3] = {
 void main_window_tick_callback(void *arg)
 {
     MainWindow *mw = (MainWindow*)arg;
-    if (mw->tick()) Fl::repeat_timeout(1.0/gFPS, main_window_tick_callback, arg);
+    mw->tick();
     mw->redraw();
+    Fl::repeat_timeout(1.0/gFPS, main_window_tick_callback, arg);
+}
+
+void main_window_save_cube_callback(Fl_File_Chooser *fc, void *arg)
+{
+    MainWindow *mw = (MainWindow*)arg;
+    if (fc->count() == 1)
+    {
+        const char *path = fc->value();
+        std::ofstream ofs(path);
+        if (writeCube(ofs, mw->cube()))
+        {
+            printf("Cube saved at %s.\n", path);
+        }
+        else
+        {
+            printf("Failed to save cube at %s!\n", path);
+        }
+    }
 }
 
 MainWindow::MainWindow( int x, int y, int w, int h, const char *winTitle,
@@ -58,44 +80,51 @@ MainWindow::MainWindow( int x, int y, int w, int h, const char *winTitle,
     : Fl_Gl_Window(x, y, w, h, winTitle),
       mCube(gSolvedCube),
       mLabelsTexture(0), mLabelsImage(labels),
-      mAnimRotFace(-1), mAnimRotAngle(0)
+      mAnimLastTime(time_now()), mAnimTime(0), mAnimPos(0), mAnimGoal(0)
 {
     setView();
+    Fl::add_timeout(1.0/gFPS, main_window_tick_callback, this);
 }
 
 MainWindow::~MainWindow()
 {
+    Fl::remove_timeout(main_window_tick_callback, this);
     glDeleteTextures(1, &mLabelsTexture);
     delete mLabelsImage;
 }
 
-void MainWindow::animate(std::vector<int> moves)
+void MainWindow::addMove(const Move &move)
 {
-    if (!mAnimMoves.empty())
-    {
-        mAnimMoves.insert(mAnimMoves.end(), moves.begin(), moves.end());
-        return;
-    }
-    else
-    {
-        Fl::remove_timeout(&main_window_tick_callback);
+    mAnimMoves.push_back(move);
+}
 
-        mAnimMoves.assign(moves.begin(), moves.end());
-        if (!moves.empty())
-        {
-            mAnimRotFace = moves.front();
-            mAnimRotTime = 0;
-            mAnimLastTime = time_now();
-
-            Fl::add_timeout(1.0/gFPS, main_window_tick_callback, this);
-        }
-    }
+void MainWindow::addMoves(const std::vector<Move> &moves)
+{
+    mAnimMoves.insert(mAnimMoves.end(), moves.begin(), moves.end());
 }
 
 void MainWindow::setView(float rotX, float rotY)
 {
     mRotX = rotX;
     mRotY = rotY;
+}
+
+void MainWindow::advanceAnim(int moves)
+{
+    if (moves < 0 && (size_t)-moves > mAnimGoal)
+    {
+        mAnimGoal = 0;
+    }
+    else
+    if (moves > 0 && mAnimMoves.size() - mAnimGoal < (size_t)moves)
+    {
+        mAnimGoal = mAnimMoves.size();
+    }
+    else
+    {
+        mAnimGoal = mAnimGoal + moves;
+    }
+    printf("pos=%d goal=%d\n", (int)mAnimPos, (int)mAnimGoal);
 }
 
 void MainWindow::draw()
@@ -154,6 +183,22 @@ void MainWindow::draw()
     // Use texture for rendering faces
     glBindTexture(GL_TEXTURE_2D, mLabelsTexture);
 
+    // Check which face animation we're doing (if any)
+    int anim_face = -1;
+    float anim_angle = 0;
+    if (mAnimPos < mAnimMoves.size())
+    {
+        anim_face = mAnimMoves[mAnimPos].face;
+        switch (mAnimMoves[mAnimPos].turn)
+        {
+        case 1:  anim_angle =   90; break;
+        case 2:  anim_angle = -180; break;
+        case 3:  anim_angle =  -90; break;
+        default: anim_angle =    0; break;
+        }
+        anim_angle *= mAnimTime/gFaceTurnTime;
+    }
+
     for (int f = 0; f < 6; ++f)
     {
         for (int r = 0; r < 3; ++r)
@@ -161,11 +206,10 @@ void MainWindow::draw()
             for (int c = 0; c < 3; ++c)
             {
                 glPushMatrix();
-                if ( mAnimRotFace >= 0 &&
-                     (gFaceMap[f][r][c] & BIT(mAnimRotFace)) )
+                if (gFaceMap[f][r][c] & BIT(anim_face))
                 {
-                    const float *axis = gFaceAxis[mAnimRotFace];
-                    glRotatef(mAnimRotAngle, axis[0], axis[1], axis[2]);
+                    const float *axis = gFaceAxis[anim_face];
+                    glRotatef(anim_angle, axis[0], axis[1], axis[2]);
                 }
                 glRotatef(gFaceRotX[f], 1, 0, 0);
                 glRotatef(gFaceRotY[f], 0, 1, 0);
@@ -231,17 +275,33 @@ int MainWindow::handle(int event)
     case FL_KEYDOWN:
         switch (Fl::event_key())
         {
-        case 'r':
+        case 's':
+            if (Fl::event_state(FL_CTRL))
+            {
+                Fl_File_Chooser *fc = new Fl_File_Chooser(
+                    ".", "Text Files (*.txt)\tAll Files (*)",
+                    Fl_File_Chooser::CREATE, "Save Cube As");
+                fc->show();
+                fc->callback(main_window_save_cube_callback, this);
+            }
+            break;
+
+        case 'c':
             setView();
             redraw();
             return 1;
 
-        case '0': animate(std::vector<int>(1, 0)); return 1;
-        case '1': animate(std::vector<int>(1, 1)); return 1;
-        case '2': animate(std::vector<int>(1, 2)); return 1;
-        case '3': animate(std::vector<int>(1, 3)); return 1;
-        case '4': animate(std::vector<int>(1, 4)); return 1;
-        case '5': animate(std::vector<int>(1, 5)); return 1;
+        case '0': case 'u': moveManual(0, Fl::event_state(FL_SHIFT)); return 1;
+        case '1': case 'f': moveManual(1, Fl::event_state(FL_SHIFT)); return 1;
+        case '2': case 'r': moveManual(2, Fl::event_state(FL_SHIFT)); return 1;
+        case '3': case 'b': moveManual(3, Fl::event_state(FL_SHIFT)); return 1;
+        case '4': case 'l': moveManual(4, Fl::event_state(FL_SHIFT)); return 1;
+        case '5': case 'd': moveManual(5, Fl::event_state(FL_SHIFT)); return 1;
+
+        case FL_Right:      advanceAnim( +1); break;
+        case FL_Left:       advanceAnim( -1); break;
+        case FL_Page_Up:    advanceAnim(+10); break;
+        case FL_Page_Down:  advanceAnim(-10); break;
 
         default:
             break;
@@ -255,28 +315,55 @@ int MainWindow::handle(int event)
     return Fl_Gl_Window::handle(event);
 }
 
-bool MainWindow::tick()
+void MainWindow::tick()
 {
     double now = time_now(), dt = now - mAnimLastTime;
     mAnimLastTime = now;
 
-    mAnimRotTime += dt;
-    while (mAnimRotTime >= gFaceTurnTime)
+    assert(mAnimTime >= 0 && mAnimTime < gFaceTurnTime);
+
+    if (mAnimPos < mAnimGoal)
     {
-        mAnimRotTime -= gFaceTurnTime;
-
-        // Update cube with current move
-        mCube.move(mAnimMoves.front());
-        mAnimMoves.pop_front();
-
-        // Start rotating face for next move
-        if (mAnimMoves.empty())
+        mAnimTime += dt;
+        while (mAnimTime >= gFaceTurnTime)
         {
-            mAnimRotFace = -1;
-            return false;
+            mCube.move(mAnimMoves[mAnimPos].face, mAnimMoves[mAnimPos].turn);
+            mAnimPos += 1;
+            mAnimTime -= gFaceTurnTime;
+            if (mAnimPos == mAnimGoal)
+            {
+                mAnimTime = 0;
+                break;
+            }
         }
-        mAnimRotFace = mAnimMoves.front();
     }
-    mAnimRotAngle = 90.0f*mAnimRotTime/gFaceTurnTime;
-    return true;
+    else
+    if (mAnimPos > mAnimGoal || (mAnimPos == mAnimGoal && mAnimTime > 0))
+    {
+        mAnimTime -= dt;
+        while (mAnimTime < 0)
+        {
+            if (mAnimPos == mAnimGoal)
+            {
+                mAnimTime = 0;
+                break;
+            }
+            mAnimTime += gFaceTurnTime;
+            mAnimPos -= 1;
+            mCube.move(mAnimMoves[mAnimPos].face, 4 - mAnimMoves[mAnimPos].turn);
+        }
+    }
+}
+
+void MainWindow::moveManual(int face, bool ccw)
+{
+    if (mAnimGoal != mAnimMoves.size())
+    {
+        printf("WARNING: manual move ignored (not at end of animation)\n");
+        return;
+    }
+
+    Move move = { face, ccw ? 1 : 3 };
+    addMove(move);
+    advanceAnim(1);
 }

@@ -2,13 +2,13 @@
 #define MAIN_WINDOW_H_INCLUDED
 
 #include "Cube.h"
+#include "Move.h"
 
 #include <FL/Fl_Gl_Window.h>
 #include <FL/Fl_RGB_Image.h>
 #include <FL/gl.h>
 
 #include <vector>
-#include <deque>
 
 
 class MainWindow
@@ -22,13 +22,17 @@ public:
     void setCube(Cube &cube) { mCube = cube; }
     const Cube &cube() { return mCube; }
 
-    void animate(std::vector<int> moves);
+    void addMove(const Move &move);
+    void addMoves(const std::vector<Move> &moves);
     void setView(float rotX = 30, float rotY = -30);
+
+    void advanceAnim(int moves = 1);
 
 protected:
     void draw();
     int handle(int event);
-    bool tick();
+    void tick();
+    void moveManual(int face, bool ccw);
 
 private:
     Cube mCube;
@@ -36,12 +40,10 @@ private:
     float mRotX, mRotY;
     GLuint mLabelsTexture;
     Fl_RGB_Image *mLabelsImage;
-    std::deque<int> mAnimMoves;
 
-    double mAnimLastTime;
-    int mAnimRotFace;
-    float mAnimRotAngle;
-    float mAnimRotTime;
+    std::vector<Move> mAnimMoves;
+    double mAnimLastTime, mAnimTime;
+    size_t mAnimPos, mAnimGoal;
 
     friend void main_window_tick_callback(void *arg);
 };

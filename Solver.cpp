@@ -34,7 +34,8 @@ Solver::~Solver()
 
 struct QueueState
 {
-    int base_dist, dist_left, last_move;
+    unsigned short base_dist, dist_left;
+    Move last_move;
     size_t cube_id;
 };
 
@@ -43,15 +44,15 @@ bool operator< (const QueueState &a, const QueueState &b)
     return a.base_dist + 1000*a.dist_left > b.base_dist + 1000*b.dist_left;
 }
 
-bool Solver::solve(std::vector<int> &solution)
+bool Solver::solve(std::vector<Move> &solution)
 {
     solution.clear();
 
     if (mInitialCube == gSolvedCube) return true;
 
-    std::map<size_t, int> visited;  // cube id -> last move
+    std::map<size_t, Move> visited;  // cube id -> last move
     std::priority_queue<QueueState> queue;
-    QueueState initial = { 0, heuristic(mInitialCube), -1,
+    QueueState initial = { 0, heuristic(mInitialCube), { 0, 0 },
                            cubeToId(mInitialCube) };
     queue.push(initial);
 
@@ -75,14 +76,13 @@ bool Solver::solve(std::vector<int> &solution)
         if (state.dist_left == 0)
         {
             printf("Found path of length %d!\n", state.base_dist);
-            int last_move = state.last_move;
+            Move last_move = state.last_move;
             Cube cube = idToCube(state.cube_id);
             assert(visited.find(state.cube_id) != visited.end());
-            while (last_move != -1)
+            while (last_move.turn > 0)
             {
-                int f = last_move/4, x = last_move%4;
-                for (int n = 0; n < x; ++n) solution.push_back(f);
-                for (int n = x; n < 4; ++n) cube.move(f);
+                solution.push_back(last_move);
+                cube.move(last_move.face, 4 - last_move.turn);
                 size_t cube_id = cubeToId(cube);
                 assert(visited.find(cube_id) != visited.end());
                 last_move = visited[cube_id];
@@ -91,17 +91,17 @@ bool Solver::solve(std::vector<int> &solution)
             return true;
         }
 
-        for (int n = 0; n < 6; ++n)
+        for (Move move = { 0, 0 }; move.face < 6; ++move.face)
         {
             Cube new_cube = idToCube(state.cube_id);
-            for (int x = 1; x < 4; ++x)
+            for (move.turn = 1; move.turn < 4; ++move.turn)
             {
-                new_cube.move(n);
+                new_cube.move(move.face, 1);
                 size_t new_cube_id = cubeToId(new_cube);
                 if (visited.find(new_cube_id) == visited.end())
                 {
                     QueueState new_state = { state.base_dist + 1,
-                        heuristic(new_cube), 4*n + x, new_cube_id };
+                        heuristic(new_cube), move, new_cube_id };
                     queue.push(new_state);
                 }
             }

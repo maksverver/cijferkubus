@@ -1,5 +1,5 @@
-SOLVER_OBJS=Cube.o Solver.o Timing.o main-solver.o
-VIEWER_OBJS=Cube.o Timing.o MainWindow.o main-viewer.o
+SOLVER_OBJS=Cube.o Move.o Solver.o Timing.o main-solver.o
+VIEWER_OBJS=Cube.o Move.o Timing.o MainWindow.o main-viewer.o
 BINARIES=solver viewer
 
 FLTK_CONFIG=fltk-config --use-gl --use-images
