@@ -48,6 +48,34 @@ static const int gFaceMap[6][3][3] = {
       { BIT(5)       |BIT(4), BIT(5),        BIT(5)       |BIT(2) },
       { BIT(5)|BIT(3)|BIT(4), BIT(5)|BIT(3), BIT(5)|BIT(3)|BIT(2) } } };
 
+/*  Double signed area of triangle.
+    abs(0.5*area(p,q,r)) == area of triangle p,q,r
+
+    Triangle from p to q to r counterclockwise iff
+    r on the left of the line from p to q iff
+
+        |  p.x  p.y  1  |
+    det |  q.y  q.y  1  | > 0
+        |  r.y  r.y  1  |
+*/
+static double area(const Point &p, const Point &q, const Point &r)
+{
+    return  p.x * q.y - p.y * q.x +
+            p.y * r.x - p.x * r.y +
+            q.x * r.y - r.x * q.y;
+}
+
+/*  Determines if point `p` lies inside or on the boundary of the
+    quadrilateral `quad' (which must be in anticlockwise order) */
+static bool point_in_quad(const Point (&quad)[4], const Point &p)
+{
+    for (int n = 0; n < 4; ++n)
+    {
+        if (area(quad[n], quad[(n + 1)%4], p) < 0) return false;
+    }
+    return true;
+}
+
 
 void main_window_tick_callback(void *arg)
 {
@@ -80,7 +108,8 @@ MainWindow::MainWindow( int x, int y, int w, int h, const char *winTitle,
     : Fl_Gl_Window(x, y, w, h, winTitle),
       mCube(gSolvedCube),
       mLabelsTexture(0), mLabelsImage(labels),
-      mAnimLastTime(time_now()), mAnimTime(0), mAnimPos(0), mAnimGoal(0)
+      mAnimLastTime(time_now()), mAnimTime(0), mAnimPos(0), mAnimGoal(0),
+      mSelectedFace(-1)
 {
     setView();
     Fl::add_timeout(1.0/gFPS, main_window_tick_callback, this);
@@ -134,18 +163,11 @@ void MainWindow::draw()
         // Set up viewport
         glViewport(0, 0, w(), h());
 
-        // Set up projection
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(45.0f, (float)w()/(float)h(), 1, 100);
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-
         // Set background color
         glClearColor(0.1f, 0.1f, 0.2f, 0.0f);
 
         // Set Z buffering
         glClearDepth(1.0f);
-        glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
 
         // Enable backface culling
@@ -171,7 +193,14 @@ void MainWindow::draw()
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 
+    // Clear
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Set up projection
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0f, (float)w()/(float)h(), 1, 100);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
     // Set up model transformation
     glMatrixMode(GL_MODELVIEW);
@@ -199,6 +228,7 @@ void MainWindow::draw()
         anim_angle *= mAnimTime/gFaceTurnTime;
     }
 
+    glEnable(GL_DEPTH_TEST);
     for (int f = 0; f < 6; ++f)
     {
         for (int r = 0; r < 3; ++r)
@@ -215,43 +245,96 @@ void MainWindow::draw()
                 glRotatef(gFaceRotY[f], 0, 1, 0);
 
                 const Face &face = mCube.face(f, r, c);
+                const int face_id = 9*f + 3*r + c;
 
-                int lr = face.sym/3, lc = face.sym%3, rrot = (-face.rot + 4)%4;
+                int lr = face.sym/3, lc = face.sym%3;
 
-                float labelCoords[4][2] = { { (lc + 0)/3.0f, (lr + 1)/3.0f },
-                                            { (lc + 1)/3.0f, (lr + 1)/3.0f },
-                                            { (lc + 1)/3.0f, (lr + 0)/3.0f },
-                                            { (lc + 0)/3.0f, (lr + 0)/3.0f } };
+                // Determine texture coordinates for this face subrectangle
+                float texCoords[4][2] = { { (lc + 0)/3.0f, (lr + 1)/3.0f },
+                                          { (lc + 1)/3.0f, (lr + 1)/3.0f },
+                                          { (lc + 1)/3.0f, (lr + 0)/3.0f },
+                                          { (lc + 0)/3.0f, (lr + 0)/3.0f } };
 
-                glBegin(GL_QUADS);
+                std::rotate( &texCoords[0][0], &texCoords[-face.rot&3][0],
+                             &texCoords[4][0] );
+
+                // Determine coordinates for this face subrectangle
+                float quad[4][3] = { { 2*c - 3, 1 - 2*r, 3 },
+                                     { 2*c - 1, 1 - 2*r, 3 },
+                                     { 2*c - 1, 3 - 2*r, 3 },
+                                     { 2*c - 3, 3 - 2*r, 3 } };
+
+                // Determine on-screen coordinates of this face subrectangle
+                {
+                    GLdouble modelview[16], projection[16];
+                    GLint viewport[4];
+                    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+                    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+                    glGetIntegerv(GL_VIEWPORT, viewport);
+                    for (int n = 0; n < 4; ++n)
+                    {
+                        GLdouble winX, winY, winZ;
+                        gluProject( quad[n][0], quad[n][1], quad[n][2], 
+                                    modelview, projection, viewport,
+                                    &winX, &winY, &winZ );
+                        /* NOTE: since OpenGL y coordinates start at the bottom,
+                           but FLTK coordinates start at the top, we must flip
+                           the coordinates vertically. This also reverses the
+                           order of the points, so we must assign them in
+                           reverse to maintain counterclockwise order. */
+                        mFaceWinCoords[face_id][3 - n] =
+                            Point(winX, h() - winY - 1);
+                    }
+                }
 
                 // Textured front face
-                glColor3f(1, 1, 1);
-                glTexCoord2f( labelCoords[(rrot + 0)%4][0],
-                              labelCoords[(rrot + 0)%4][1] );
-                glVertex3f(2*c - 3, 1 - 2*r, 3);
-                glTexCoord2f( labelCoords[(rrot + 1)%4][0],
-                              labelCoords[(rrot + 1)%4][1] );
-                glVertex3f(2*c - 1, 1 - 2*r, 3);
-                glTexCoord2f( labelCoords[(rrot + 2)%4][0],
-                              labelCoords[(rrot + 2)%4][1] );
-                glVertex3f(2*c - 1, 3 - 2*r, 3);
-                glTexCoord2f( labelCoords[(rrot + 3)%4][0],
-                              labelCoords[(rrot + 3)%4][1] );
-                glVertex3f(2*c - 3, 3 - 2*r, 3);
+                glEnable(GL_TEXTURE_2D);
+                glBegin(GL_QUADS);
+                if (face_id != mSelectedFace)
+                {
+                    glColor3f(1, 1, 1);
+                }
+                else
+                {
+                    glColor3f(1, 1, 0);
+                }
+                for (int n = 0; n < 4; ++n)
+                {
+                    glTexCoord2f(texCoords[n][0], texCoords[n][1]);
+                    glVertex3f(quad[n][0], quad[n][1], quad[n][2]);
+                }
+                glEnd();
 
                 // Black backface
+                glDisable(GL_TEXTURE_2D);
+                glBegin(GL_QUADS);
                 glColor3f(0, 0, 0);
-                glVertex3f(2*c - 3, 3 - 2*r, 3);
-                glVertex3f(2*c - 1, 3 - 2*r, 3);
-                glVertex3f(2*c - 1, 1 - 2*r, 3);
-                glVertex3f(2*c - 3, 1 - 2*r, 3);
-
+                for (int n = 3; n >= 0; --n)
+                {
+                    glVertex3f(quad[n][0], quad[n][1], quad[n][2]);
+                }
                 glEnd();
 
                 glPopMatrix();
             }
         }
+    }
+
+    // Set-up 2D overlay
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_TEXTURE_2D);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, w(), 0, h(), 0, 1);
+
+    if (!mCube.seemsValid())
+    {
+        gl_font(FL_HELVETICA | FL_BOLD, 12);
+        gl_color(FL_RED);
+        gl_draw("Warning: invalid cube!", 10, 10);
     }
 }
 
@@ -260,16 +343,36 @@ int MainWindow::handle(int event)
     switch (event)
     {
     case FL_PUSH:
-        mLastX = Fl::event_x();
-        mLastY = Fl::event_y(); 
+        if (Fl::event_state(FL_BUTTON1))
+        {
+            mLastX = Fl::event_x();
+            mLastY = Fl::event_y(); 
+        }
+        if (Fl::event_state(FL_BUTTON3))
+        {
+            Point p(Fl::event_x(), Fl::event_y());
+            mSelectedFace = -1;
+            for (int n = 0; n < Cube::num_faces; ++n)
+            {
+                if (point_in_quad(mFaceWinCoords[n], p))
+                {
+                    mSelectedFace = n;
+                    break;
+                }
+            }
+            redraw();
+        }
         return 1;
 
     case FL_DRAG:
-        mRotY += (Fl::event_x() - mLastX);
-        mRotX += (Fl::event_y() - mLastY);
-        mLastX = Fl::event_x();
-        mLastY = Fl::event_y();
-        redraw();
+        if (Fl::event_state(FL_BUTTON1))
+        {
+            mRotY += (Fl::event_x() - mLastX);
+            mRotX += (Fl::event_y() - mLastY);
+            mLastX = Fl::event_x();
+            mLastY = Fl::event_y();
+            redraw();
+        }
         return 1;
 
     case FL_KEYDOWN:
@@ -291,12 +394,22 @@ int MainWindow::handle(int event)
             redraw();
             return 1;
 
-        case '0': case 'u': moveManual(0, Fl::event_state(FL_SHIFT)); return 1;
-        case '1': case 'f': moveManual(1, Fl::event_state(FL_SHIFT)); return 1;
-        case '2': case 'r': moveManual(2, Fl::event_state(FL_SHIFT)); return 1;
-        case '3': case 'b': moveManual(3, Fl::event_state(FL_SHIFT)); return 1;
-        case '4': case 'l': moveManual(4, Fl::event_state(FL_SHIFT)); return 1;
-        case '5': case 'd': moveManual(5, Fl::event_state(FL_SHIFT)); return 1;
+        case 'u': moveManual(0, Fl::event_state(FL_SHIFT)); return 1;
+        case 'f': moveManual(1, Fl::event_state(FL_SHIFT)); return 1;
+        case 'r': moveManual(2, Fl::event_state(FL_SHIFT)); return 1;
+        case 'b': moveManual(3, Fl::event_state(FL_SHIFT)); return 1;
+        case 'l': moveManual(4, Fl::event_state(FL_SHIFT)); return 1;
+        case 'd': moveManual(5, Fl::event_state(FL_SHIFT)); return 1;
+
+        case '1': setSelectedFaceSymbol(0); redraw(); return 1;
+        case '2': setSelectedFaceSymbol(1); redraw(); return 1;
+        case '3': setSelectedFaceSymbol(2); redraw(); return 1;
+        case '4': setSelectedFaceSymbol(3); redraw(); return 1;
+        case '5': setSelectedFaceSymbol(4); redraw(); return 1;
+        case '6': setSelectedFaceSymbol(5); redraw(); return 1;
+        case '7': setSelectedFaceSymbol(6); redraw(); return 1;
+        case '8': setSelectedFaceSymbol(7); redraw(); return 1;
+        case '9': setSelectedFaceSymbol(8); redraw(); return 1;
 
         case FL_Right:      advanceAnim( +1); break;
         case FL_Left:       advanceAnim( -1); break;
@@ -366,4 +479,20 @@ void MainWindow::moveManual(int face, bool ccw)
     Move move = { face, ccw ? 1 : 3 };
     addMove(move);
     advanceAnim(1);
+}
+
+void MainWindow::setSelectedFaceSymbol(int sym)
+{
+    if (mSelectedFace >= 0 && mSelectedFace < Cube::num_faces)
+    {
+        Face &face = mCube.face(mSelectedFace);
+        if (face.sym != sym)
+        {
+            face.sym = sym;
+        }
+        else
+        {
+            face.rotate(1);
+        }
+    }
 }

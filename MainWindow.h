@@ -10,6 +10,12 @@
 
 #include <vector>
 
+struct Point
+{
+    double x, y;
+
+    Point(double x = 0, double y = 0) : x(x), y(y) { };
+};
 
 class MainWindow
     : public Fl_Gl_Window
@@ -33,6 +39,7 @@ protected:
     int handle(int event);
     void tick();
     void moveManual(int face, bool ccw);
+    void setSelectedFaceSymbol(int sym);
 
 private:
     Cube mCube;
@@ -40,10 +47,11 @@ private:
     float mRotX, mRotY;
     GLuint mLabelsTexture;
     Fl_RGB_Image *mLabelsImage;
-
     std::vector<Move> mAnimMoves;
     double mAnimLastTime, mAnimTime;
     size_t mAnimPos, mAnimGoal;
+    Point mFaceWinCoords[Cube::num_faces][4];
+    int mSelectedFace;
 
     friend void main_window_tick_callback(void *arg);
 };
