@@ -8,10 +8,48 @@
 #include <vector>
 #include <map>
 
-struct CubeHasher
+class CubeRef
 {
-    size_t operator() (const Cube &cube) const { return cube.hashCode(); }
+private:
+    typedef unsigned int cube_id_t;
+
+    static std::unordered_map<Cube, cube_id_t> mCubeToId;
+    static std::vector<const Cube*> mIdToCube;
+
+public:
+    CubeRef(const Cube &cube) : cube_id(cubeToId(cube)) { };
+    CubeRef(const CubeRef &cr) : cube_id(cr.cube_id) { };
+
+    CubeRef &operator= (const CubeRef &cr) { cube_id = cr.cube_id; return *this; }
+
+    bool operator== (const CubeRef &cr) const { return cube_id == cr.cube_id; }
+    bool operator!= (const CubeRef &cr) const { return cube_id != cr.cube_id; }
+    bool operator<  (const CubeRef &cr) const { return cube_id <  cr.cube_id; }
+    bool operator>  (const CubeRef &cr) const { return cube_id >  cr.cube_id; }
+    bool operator<= (const CubeRef &cr) const { return cube_id <= cr.cube_id; }
+    bool operator>= (const CubeRef &cr) const { return cube_id >= cr.cube_id; }
+
+    const Cube &operator*()  const { return  idToCube(cube_id); }
+    const Cube *operator->() const { return &idToCube(cube_id); }
+
+    size_t hashCode() const { return std::hash<cube_id_t>()(cube_id); }
+
+private:
+    static size_t cubeToId(const Cube &c);
+    static const Cube &idToCube(size_t n) { return *mIdToCube.at(n); }
+
+private:
+    cube_id_t cube_id;
 };
+
+namespace std {
+    template<> struct hash<Cube> {
+        size_t operator()(const Cube &c) const { return c.hashCode(); }
+    };
+    template<> struct hash<CubeRef> {
+        size_t operator()(const CubeRef &cr) const { return cr.hashCode(); }
+    };
+}
 
 class Solver
 {
@@ -22,13 +60,7 @@ public:
     bool solve(std::vector<Move> &solution);
 
 private:
-    size_t cubeToId(const Cube &c);
-    const Cube &idToCube(size_t n) { return *mIdToCube.at(n); }
-
-private:
     const Cube mInitialCube;
-    std::unordered_map<Cube, size_t, CubeHasher> mCubeToId;
-    std::vector<const Cube*> mIdToCube;
 };
 
 #endif /* ndef SOLVER_H_INCLUDED */

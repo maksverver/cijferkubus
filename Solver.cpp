@@ -15,6 +15,30 @@ using std::make_pair;
 const int precompute_dist   =    5;  // distance from solution to precompute
 const int dist_left_weight  = 1000;  // weight of dist_left factor
 
+std::unordered_map<Cube, CubeRef::cube_id_t> CubeRef::mCubeToId;
+std::vector<const Cube*> CubeRef::mIdToCube;
+
+size_t CubeRef::cubeToId(const Cube &c)
+{
+    pair<std::unordered_map<Cube, cube_id_t>::iterator, bool>
+        ins_res = mCubeToId.insert(make_pair(c, 0));
+
+    if (ins_res.second == false)
+    {
+        // Entry already exists
+        return ins_res.first->second;
+    }
+    else
+    {
+        // Newly inserted entry; create next id
+        size_t id = mIdToCube.size();
+        ins_res.first->second = id;
+        mIdToCube.push_back(&ins_res.first->first);
+        return id;
+    }
+}
+
+
 // Estimates the distance to the solved cube
 int heuristic(const Cube &c)
 {
@@ -39,7 +63,7 @@ struct QueueState
 {
     unsigned short base_dist, dist_left;
     Move last_move;
-    size_t cube_id;
+    CubeRef cube;
 };
 
 bool operator< (const QueueState &a, const QueueState &b)
@@ -55,30 +79,29 @@ bool Solver::solve(std::vector<Move> &solution)
 
     const Move null_move = { 0, 0 };
 
-    std::unordered_map<size_t, Move> solvedCubes; // cube_id -> inverse_move
+    std::unordered_map<CubeRef, Move> solvedCubes; // cube -> inverse_move
     {
-        std::vector<size_t> queue, next_queue;
-        queue.push_back(cubeToId(gSolvedCube));
+        std::vector<CubeRef> queue, next_queue;
+        queue.push_back(gSolvedCube);
         solvedCubes[queue[0]] = null_move;
         for (int n = 0; n < precompute_dist; ++n)
         {
             next_queue.clear();
-            for ( std::vector<size_t>::const_iterator it = queue.begin();
+            for ( std::vector<CubeRef>::const_iterator it = queue.begin();
                   it != queue.end(); ++it )
             {
-                size_t cube_id = *it;
                 for (Move move = { 0, 0 }; move.face < 6; ++move.face)
                 {
-                    Cube new_cube = idToCube(cube_id);
+                    Cube new_cube = *(*it);
                     for (move.turn = 1; move.turn < 4; ++move.turn)
                     {
                         new_cube.move(move.face, 1);
-                        size_t new_cube_id = cubeToId(new_cube);
-                        if (solvedCubes.find(new_cube_id) == solvedCubes.end())
+                        CubeRef new_cube_ref(new_cube);
+                        if (solvedCubes.find(new_cube_ref) == solvedCubes.end())
                         {
                             Move inv_move = { move.face, 4 - move.turn };
-                            solvedCubes[new_cube_id] = inv_move;
-                            next_queue.push_back(new_cube_id);
+                            solvedCubes[new_cube_ref] = inv_move;
+                            next_queue.push_back(new_cube_ref);
                         }
                     }
                 }
@@ -87,10 +110,9 @@ bool Solver::solve(std::vector<Move> &solution)
         }
     }
 
-    std::unordered_map<size_t, Move> visited;  // cube id -> last move
+    std::unordered_map<CubeRef, Move> visited;  // cube -> last move
     std::priority_queue<QueueState> queue;
-    QueueState initial = { 0, heuristic(mInitialCube),
-                           null_move, cubeToId(mInitialCube) };
+    QueueState initial = { 0, heuristic(mInitialCube), null_move, mInitialCube };
     queue.push(initial);
 
     while (!queue.empty())
@@ -98,33 +120,32 @@ bool Solver::solve(std::vector<Move> &solution)
         QueueState state = queue.top();
         queue.pop();
 
-        if (!visited.insert(make_pair(state.cube_id, state.last_move)).second)
+        if (!visited.insert(make_pair(state.cube, state.last_move)).second)
         {
             continue;
         }
 
         for (Move move = { 0, 0 }; move.face < 6; ++move.face)
         {
-            Cube new_cube = idToCube(state.cube_id);
+            Cube new_cube = *state.cube;
             for (move.turn = 1; move.turn < 4; ++move.turn)
             {
                 new_cube.move(move.face, 1);
-                size_t new_cube_id = cubeToId(new_cube);
-                if (visited.find(new_cube_id) == visited.end())
+                CubeRef new_cube_ref(new_cube);
+                if (visited.find(new_cube_ref) == visited.end())
                 {
-                    if (solvedCubes.find(new_cube_id) != solvedCubes.end())
+                    if (solvedCubes.find(new_cube_ref) != solvedCubes.end())
                     {
                         // Find trace of moves from start to current state
                         Move last_move = state.last_move;
-                        Cube cube = idToCube(state.cube_id);
-                        assert(visited.find(state.cube_id) != visited.end());
+                        Cube cube = *state.cube;
+                        assert(visited.find(cube) != visited.end());
                         while (last_move != null_move)
                         {
                             solution.push_back(last_move);
                             cube.move(last_move.face, 4 - last_move.turn);
-                            size_t cube_id = cubeToId(cube);
-                            assert(visited.find(cube_id) != visited.end());
-                            last_move = visited[cube_id];
+                            assert(visited.find(cube) != visited.end());
+                            last_move = visited[cube];
                         }
                         std::reverse(solution.begin(), solution.end());
 
@@ -133,14 +154,12 @@ bool Solver::solve(std::vector<Move> &solution)
 
                         // Add moves to final solved cube
                         {
-                            size_t cube_id = new_cube_id;
-                            Cube cube = idToCube(cube_id);
+                            Cube cube = *new_cube_ref;
                             while (cube != gSolvedCube)
                             {
-                                Move next_move = solvedCubes[cube_id];
+                                Move next_move = solvedCubes[cube];
                                 solution.push_back(next_move);
                                 cube.move(next_move.face, next_move.turn);
-                                cube_id = cubeToId(cube);
                             }
                         }
 
@@ -148,31 +167,11 @@ bool Solver::solve(std::vector<Move> &solution)
                     }
 
                     QueueState new_state = { state.base_dist + 1,
-                        heuristic(new_cube), move, new_cube_id };
+                        heuristic(new_cube), move, new_cube_ref };
                     queue.push(new_state);
                 }
             }
         }
     }
     return false;
-}
-
-size_t Solver::cubeToId(const Cube &c)
-{
-    pair<std::unordered_map<Cube, size_t>::iterator, bool>
-        ins_res = mCubeToId.insert(make_pair(c, 0));
-
-    if (ins_res.second == false)
-    {
-        // Entry already exists
-        return ins_res.first->second;
-    }
-    else
-    {
-        // Newly inserted entry; create next id
-        size_t id = mIdToCube.size();
-        ins_res.first->second = id;
-        mIdToCube.push_back(&ins_res.first->first);
-        return id;
-    }
 }
