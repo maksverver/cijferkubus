@@ -250,19 +250,19 @@ void MainWindow::draw()
                 int lr = face.sym/3, lc = face.sym%3;
 
                 // Determine texture coordinates for this face subrectangle
-                float texCoords[4][2] = { { (lc + 0)/3.0f, (lr + 1)/3.0f },
-                                          { (lc + 1)/3.0f, (lr + 1)/3.0f },
-                                          { (lc + 1)/3.0f, (lr + 0)/3.0f },
-                                          { (lc + 0)/3.0f, (lr + 0)/3.0f } };
+                float texCoords[4][2] = { { (lc + 0.0f)/3.0f, (lr + 1.0f)/3.0f },
+                                          { (lc + 1.0f)/3.0f, (lr + 1.0f)/3.0f },
+                                          { (lc + 1.0f)/3.0f, (lr + 0.0f)/3.0f },
+                                          { (lc + 0.0f)/3.0f, (lr + 0.0f)/3.0f } };
 
                 std::rotate( &texCoords[0][0], &texCoords[-face.rot&3][0],
                              &texCoords[4][0] );
 
                 // Determine coordinates for this face subrectangle
-                float quad[4][3] = { { 2*c - 3, 1 - 2*r, 3 },
-                                     { 2*c - 1, 1 - 2*r, 3 },
-                                     { 2*c - 1, 3 - 2*r, 3 },
-                                     { 2*c - 3, 3 - 2*r, 3 } };
+                float quad[4][3] = { { 2.0f*c - 3.0f, 1.0f - 2.0f*r, 3.0f },
+                                     { 2.0f*c - 1.0f, 1.0f - 2.0f*r, 3.0f },
+                                     { 2.0f*c - 1.0f, 3.0f - 2.0f*r, 3.0f },
+                                     { 2.0f*c - 3.0f, 3.0f - 2.0f*r, 3.0f } };
 
                 // Determine on-screen coordinates of this face subrectangle
                 {
@@ -476,7 +476,7 @@ void MainWindow::moveManual(int face, bool ccw)
         return;
     }
 
-    Move move = { face, ccw ? 1 : 3 };
+    Move move(face, ccw ? 1 : 3);
     addMove(move);
     advanceAnim(1);
 }

@@ -61,6 +61,9 @@ Solver::~Solver()
 
 struct QueueState
 {
+    QueueState(unsigned bd, unsigned dl, Move lm, CubeRef cr)
+        : base_dist(bd), dist_left(dl), last_move(lm), cube(cr) { };
+
     unsigned short base_dist, dist_left;
     Move last_move;
     CubeRef cube;
@@ -77,13 +80,11 @@ bool Solver::solve(std::vector<Move> &solution)
     solution.clear();
     if (mInitialCube == gSolvedCube) return true;
 
-    const Move null_move = { 0, 0 };
-
     std::unordered_map<CubeRef, Move> solvedCubes; // cube -> inverse_move
     {
         std::vector<CubeRef> queue, next_queue;
         queue.push_back(gSolvedCube);
-        solvedCubes[queue[0]] = null_move;
+        solvedCubes[queue[0]] = Move();
         for (int n = 0; n < precompute_dist; ++n)
         {
             next_queue.clear();
@@ -99,7 +100,7 @@ bool Solver::solve(std::vector<Move> &solution)
                         CubeRef new_cube_ref(new_cube);
                         if (solvedCubes.find(new_cube_ref) == solvedCubes.end())
                         {
-                            Move inv_move = { move.face, 4 - move.turn };
+                            Move inv_move(move.face, 4 - move.turn);
                             solvedCubes[new_cube_ref] = inv_move;
                             next_queue.push_back(new_cube_ref);
                         }
@@ -112,7 +113,7 @@ bool Solver::solve(std::vector<Move> &solution)
 
     std::unordered_map<CubeRef, Move> visited;  // cube -> last move
     std::priority_queue<QueueState> queue;
-    QueueState initial = { 0, heuristic(mInitialCube), null_move, mInitialCube };
+    QueueState initial(0, heuristic(mInitialCube), Move(), mInitialCube);
     queue.push(initial);
 
     while (!queue.empty())
@@ -140,7 +141,7 @@ bool Solver::solve(std::vector<Move> &solution)
                         Move last_move = state.last_move;
                         Cube cube = *state.cube;
                         assert(visited.find(cube) != visited.end());
-                        while (last_move != null_move)
+                        while (last_move != Move())
                         {
                             solution.push_back(last_move);
                             cube.move(last_move.face, 4 - last_move.turn);
@@ -166,8 +167,8 @@ bool Solver::solve(std::vector<Move> &solution)
                         return true;
                     }
 
-                    QueueState new_state = { state.base_dist + 1,
-                        heuristic(new_cube), move, new_cube_ref };
+                    QueueState new_state( state.base_dist + 1,
+                        heuristic(new_cube), move, new_cube_ref );
                     queue.push(new_state);
                 }
             }
