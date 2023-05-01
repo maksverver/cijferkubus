@@ -4,7 +4,7 @@
 #include "Move.h"
 #include "Timing.h"
 
-#include <FL/Fl.h>
+#include <FL/Fl.H>
 #include <FL/Fl_PNG_Image.H>
 
 #include <stdio.h>

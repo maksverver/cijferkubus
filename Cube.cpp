@@ -101,7 +101,7 @@ void Cube::move(int f, int t)
         }
 
         // Rotate faces on sides
-        for (int d = 0; d < 3; ++d)
+        for (int i = 0; i < 3; ++i)
         {
             // DEBUG:
             /*

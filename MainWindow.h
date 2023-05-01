@@ -4,8 +4,8 @@
 #include "Cube.h"
 #include "Move.h"
 
-#include <FL/Fl_Gl_Window.h>
-#include <FL/Fl_RGB_Image.h>
+#include <FL/Fl_Gl_Window.H>
+#include <FL/Fl_RGB_Image.H>
 #include <FL/gl.h>
 
 #include <vector>
